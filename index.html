@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>شبیه‌ساز نبرد امپراتوری‌ها - نسخه نهایی و جامع</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: sans-serif; background: #1e272e; color: white; user-select: none; }
+        .hidden { display: none !important; }
+        #setup-panel { max-width: 500px; margin: 30px auto; background: #2c3e50; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .setup-row { margin-bottom: 10px; text-align: right; display: flex; justify-content: space-between; align-items: center; }
+        input { padding: 6px; border-radius: 5px; border: none; width: 55%; }
+        
+        #game-ui { display: flex; gap: 20px; height: 88vh; }
+        #sidebar { width: 320px; background: #2c3e50; padding: 15px; border-radius: 10px; overflow-y: auto; }
+        
+        #map-container { 
+            flex-grow: 1; 
+            background-color: #57606f; 
+            background-image: url('map-image.jpg'); /* نام عکس نقشه‌ات رو این‌جا بنویس */
+            background-size: cover; 
+            background-position: center;
+            position: relative; 
+            border-radius: 10px; 
+            border: 3px solid #f1c40f; 
+            overflow: hidden; 
+        }
+        
+        .city { position: absolute; width: 55px; height: 55px; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 10px; font-weight: bold; color: black; cursor: pointer; border: 2px solid white; transform: translate(-50%, -50%); transition: 0.2s; z-index: 10; }
+        .city.capital { border-radius: 8px; border: 3px solid gold; width: 60px; height: 60px; }
+        .city:hover { transform: translate(-50%, -50%) scale(1.12); box-shadow: 0 0 15px #fff; z-index: 20; }
+        .badge { font-size: 9px; background: rgba(255,255,255,0.85); padding: 1px 4px; border-radius: 3px; margin-top: 1px; font-weight: bold; }
+        
+        button { cursor: pointer; padding: 10px; border: none; border-radius: 5px; background: #27ae60; color: white; width: 100%; font-size: 14px; font-weight: bold; margin-top: 8px; }
+        button:disabled { background: #57606f !important; cursor: not-allowed; opacity: 0.4; }
+        .panel-section { background: #353b48; padding: 12px; border-radius: 5px; margin-bottom: 12px; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 100; }
+        .modal-content { background: #2c3e50; padding: 30px; border-radius: 10px; text-align: center; border: 3px solid #e74c3c; width: 350px; }
+        .rps-btns button { font-size: 32px; width: 75px; height: 75px; margin: 8px; background: #34495e; }
+        select { width: 100%; padding: 8px; border-radius: 5px; margin-top: 5px; background: #1e272e; color: white; border: 1px solid #7f8c8d; }
+        .status-tag { font-size: 11px; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 3px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <!-- ۱. پنل تنظیمات فرماندهان -->
+    <div id="setup-panel">
+        <h2 style="color: #f1c40f; margin-top: 0;">تنظیمات دیپلماتیک جنگ جهانی</h2>
+        <div id="fields-area"></div>
+        <button onclick="startGame()" style="font-size: 16px; padding: 12px; background: #2980b9;">ساخت نقشه جامع و شروع جنگ</button>
+    </div>
+
+    <!-- ۲. محیط اصلی بازی -->
+    <div id="game-ui" class="hidden">
+        <div id="sidebar">
+            <h3 id="turn-display" style="text-align: center; padding: 10px; background: #1e272e; border-radius: 5px; margin-top: 0;">نوبت: -</h3>
+            
+            <div class="panel-section">
+                <h4>خزانه و انبار منابع:</h4>
+                <div id="res-display">طلا: ۰ | آهن: ۰</div>
+                <div style="margin-top: 8px; border-top: 1px solid #4b5263; padding-top: 5px;">
+                    <div style="font-size: 11px;">وضعیت ساخت‌وساز: <span id="build-status" class="status-tag"></span></div>
+                    <div style="font-size: 11px; margin-top: 4px;">وضعیت اقدامات نظامی: <span id="attack-status" class="status-tag"></span></div>
+                </div>
+            </div>
+
+            <!-- بخش بازار و داد و ستد -->
+            <div class="panel-section">
+                <h4>بازار مرکزی (داد و ستد منابع):</h4>
+                <div style="display: flex; gap: 5px;">
+                    <button onclick="trade('goldToIron')" style="background: #d35400; font-size: 10px; padding: 6px 3px;">۳۰ طلا ➡️ ۲۰ آهن</button>
+                    <button onclick="trade('ironToGold')" style="background: #2980b9; font-size: 10px; padding: 6px 3px;">۳۰ آهن ➡️ ۲۰ طلا</button>
+                </div>
+            </div>
+
+            <!-- بخش دیپلماسی و اعلام جنگ -->
+            <div class="panel-section" style="border: 1px solid #e74c3c;">
+                <h4>وزارت امور خارجه (دیپلماسی):</h4>
+                <label for="war-target">انتخاب هدف جنگی:</label>
+                <select id="war-target"></select>
+                <button id="btn-war" onclick="declareWar()" style="background: #e74c3c; margin-top: 8px;">🔥 اعلام جنگ رسمی</button>
+                <div id="relations-list" style="font-size: 11px; margin-top: 8px; color: #ccc; max-height: 50px; overflow-y:auto;"></div>
+            </div>
+
+            <!-- بخش کنترل شهر و ارتش -->
+            <div class="panel-section">
+                <h4>مدیریت ارتش و سازه‌ها:</h4>
+                <p id="city-info" style="color: #bdc3c7; font-size: 13px; white-space: pre-line; background: #1e272e; padding: 6px; border-radius: 4px;">شهری انتخاب نشده است.</p>
+                <button id="btn-artillery" onclick="addArtillery()" style="background: #e67e22;">ساخت توپخانه (۱۵۰ آهن)</button>
+                <button id="btn-fort" onclick="buildFort()" style="background: #9b59b6;">ساخت قلعه نظامی (۲۰۰ طلا) 🏰</button>
+                <button id="btn-dock" onclick="buildDock()" style="background: #1abc9c;">ساخت اسکله حمله (۴۰ آهن) ⚓</button>
+                <button onclick="endTurn()" style="background: #7f8c8d; margin-top: 15px; color: #2c3e50; font-size: 15px;">🏁 پایان نوبت فرمانده</button>
+            </div>
+        </div>
+
+        <!-- نقشه اصلی بازی -->
+        <div id="map-container"></div>
+    </div>
+
+    <!-- ۳. منوی چالش نبرد سنگ کاغذ قیچی -->
+    <div id="battle-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="battle-title" style="color: #e74c3c; margin-top: 0;">شروع نبرد!</h2>
+            <p id="battle-turn-text">مدافع انتخاب کند...</p>
+            
+            <div class="rps-btns" id="def-zone">
+                <button onclick="playRPS('rock', 'def')">🪨</button>
+                <button onclick="playRPS('paper', 'def')">📄</button>
+                <button onclick="playRPS('scissors', 'def')">✂️</button>
+            </div>
+            <div class="rps-btns hidden" id="att-zone">
+                <button onclick="playRPS('rock', 'att')">🪨</button>
+                <button onclick="playRPS('paper', 'att')">📄</button>
+                <button onclick="playRPS('scissors', 'att')">✂️</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // پیکربندی ۶ کشور با موقعیت‌های فرضی هماهنگ روی نقشه
+        const countriesConfig = [
+            { id: 'p1', name: 'عثمانی', color: '#e74c3c', base: {x: 650, y: 380} },
+            { id: 'p2', name: 'اتریش مجارستان', color: '#f1c40f', base: {x: 460, y: 280} },
+            { id: 'p3', name: 'فرانسه', color: '#3498db', base: {x: 180, y: 280} },
+            { id: 'p4', name: 'روسیه', color: '#2ecc71', base: {x: 680, y: 130} },
+            { id: 'p5', name: 'آلمان', color: '#9b59b6', base: {x: 400, y: 140} },
+            { id: 'p6', name: 'ایتالیا', color: '#1abc9c', base: {x: 340, y: 400} }
+        ];
+
+        let players = {};
+        let cities = [];
+        let turnOrder = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+        let currentIdx = 0;
+        let selectedId = null;
+
+        // محدودیت‌های تفکیک‌شده نوبتی درخواستی شما
+        let hasBuiltThisTurn = false;
+        let hasAttackedThisTurn = false;
+
+        let battle = { attCity: null, defCity: null, defChoice: null, attChoice: null };
+
+        window.onload = () => {
+            const area = document.getElementById('fields-area');
+            countriesConfig.forEach(c => {
+                area.innerHTML += `
+                    <div class="setup-row">
+                        <label style="color:${c.color}; font-weight:bold;">فرمانده ${c.name}:</label>
+                        <input type="text" id="name-${c.id}" value="سردار ${c.name}" />
+                    </div>`;
+            });
+        };
+
+        function startGame() {
+            countriesConfig.forEach(c => {
+                players[c.id] = {
+                    name: document.getElementById(`name-${c.id}`).value,
+                    country: c.name,
+                    color: c.color,
+                    gold: 300, // منابع اولیه خوب برای شروع قدرتمند بازی
+                    iron: 250,
+                    wars: []
+                };
+            });
+
+            document.getElementById('setup-panel').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            
+            let cityId = 0;
+            countriesConfig.forEach(c => {
+                // ۱ پایتخت اصلی (۳ جان)
+                cities.push({ id: cityId++, owner: c.id, name: 'پایتخت ' + c.name, isCap: true, hp: 3, hasArt: false, hasFort: false, hasDock: false, x: c.base.x, y: c.base.y });
+                // ۴ شهر فرعی و اقماری (۱ جان)
+                cities.push({ id: cityId++, owner: c.id, name: 'معدن آهن', isCap: false, hp: 1, hasArt: false, hasFort: false, hasDock: false, x: c.base.x - 55, y: c.base.y - 45 });
+                cities.push({ id: cityId++, owner: c.id, name: 'شهر تجاری', isCap: false, hp: 1, hasArt: false, hasFort: false, hasDock: false, x: c.base.x + 65, y: c.base.y - 35 });
+                cities.push({ id: cityId++, owner: c.id, name: 'قلعه مرزی', isCap: false, hp: 1, hasArt: false, hasFort: false, hasDock: false, x: c.base.x - 45, y: c.base.y + 55 });
+                cities.push({ id: cityId++, owner: c.id, name: 'بندرگاه', isCap: false, hp: 1, hasArt: false, hasFort: false, hasDock: false, x: c.base.x + 55, y: c.base.y + 45 });
+            });
+            
+            render();
+        }
+
+        function getCurrentTurn() { return turnOrder[currentIdx]; }
+
+        function render() {
+            const container = document.getElementById('map-container');
+            const oldCities = container.querySelectorAll('.city');
+            oldCities.forEach(el => el.remove());
+
+            const cp = getCurrentTurn();
+            const p = players[cp];
+            
+            document.getElementById('turn-display').innerText = `نوبت: ${p.name}`;
+            document.getElementById('turn-display').style.color = p.color;
+            document.getElementById('res-display').innerText = `طلا: ${p.gold} 💰 | آهن: ${p.iron} ⚙️`;
+            
+            // نمایش وضعیت محدودیت حرکتی تفکیک‌شده
+            const bStatus = document.getElementById('build-status');
+            if(hasBuiltThisTurn) { bStatus.innerText = "انجام شد ❌"; bStatus.style.background = "#ff4757"; }
+            else { bStatus.innerText = "مجاز پس از انتخاب شهر 🟢"; bStatus.style.background = "#2ed573"; }
+
+            const aStatus = document.getElementById('attack-status');
+            if(hasAttackedThisTurn) { aStatus.innerText = "انجام شد ❌"; aStatus.style.background = "#ff4757"; }
+            else { aStatus.innerText = "مجاز 🟢"; aStatus.style.background = "#2ed573"; }
+
+            // مدیریت فعال/غیرفعال بودن دکمه‌های ساخت بر اساس وضعیت نوبت
+            document.getElementById('btn-artillery').disabled = hasBuiltThisTurn;
+            document.getElementById('btn-fort').disabled = hasBuiltThisTurn;
+            document.getElementById('btn-dock').disabled = hasBuiltThisTurn;
+            document.getElementById('btn-war').disabled = hasAttackedThisTurn;
+
+            // آپدیت لیست اهداف دیپلماتیک جنگی
+            const targetSelect = document.getElementById('war-target');
+            targetSelect.innerHTML = '';
+            countriesConfig.forEach(c => {
+                if(c.id !== cp) {
+                    const isAtWar = p.wars.includes(c.id);
+                    const option = document.createElement('option');
+                    option.value = c.id;
+                    option.innerText = `${c.name} ${isAtWar ? '(در حال جنگ ⚔️)' : '(صلح 🕊️)'}`;
+                    targetSelect.appendChild(option);
+                }
+            });
+
+            document.getElementById('relations-list').innerHTML = p.wars.length > 0 
+                ? "در وضعیت جنگ با: " + p.wars.map(id => players[id].country).join('، ')
+                : "در صلح کامل با همسایگان.";
+
+            // رسم مجدد تمام ۳۰ شهر روی نقشه
+            cities.forEach(c => {
+                const div = document.createElement('div');
+                div.className = `city ${c.isCap ? 'capital' : ''}`;
+                div.style.left = c.x + 'px';
+                div.style.top = c.y + 'px';
+                div.style.backgroundColor = players[c.owner].color;
+                
+                div.innerHTML = `
+                    <span style="color:black; font-size:9px; background:rgba(255,255,255,0.75); padding:1px 2px; border-radius:3px;">${c.name}</span>
+                    <span class="badge">❤️ ${c.hp}</span>
+                    ${c.hasArt ? '<span class="badge" style="background:#e67e22; color:white;">💣 توپ</span>' : ''}
+                    ${c.hasFort ? '<span class="badge" style="background:#9b59b6; color:white;">🏰 قلعه</span>' : ''}
+                    ${c.hasDock ? '<span class="badge" style="background:#1abc9c; color:white;">⚓ اسکله</span>' : ''}
+                `;
+                
+                if(selectedId === c.id) div.style.boxShadow = '0 0 25px white';
+                div.onclick = () => clickCity(c.id);
+                container.appendChild(div);
+            });
+        }
+
+        // داد و ستد منابع (بازار)
+        function trade(type) {
+            const p = players[getCurrentTurn()];
+            if (type === 'goldToIron') {
+                if (p.gold >= 30) { p.gold -= 30; p.iron += 20; alert("🛒 بازار: ۳۰ طلا پرداخت شد و ۲۰ آهن دریافت کردید."); }
+                else { alert("❌ طلا کافی نیست!"); }
+            } else {
+                if (p.iron >= 30) { p.iron -= 30; p.gold += 20; alert("🛒 بازار: ۳۰ آهن پرداخت شد و ۲۰ طلا دریافت کردید."); }
+                else { alert("❌ آهن کافی نیست!"); }
+            }
+            render();
+        }
+
+        // اعلام جنگ رسمی (جزو اقدامات نظامی نوبت محسوب می‌شود)
+        function declareWar() {
+            if(hasAttackedThisTurn) return alert("شما اقدام نظامی این نوبت خود را انجام داده‌اید!");
+            const cp = getCurrentTurn();
+            const target = document.getElementById('war-target').value;
+            if(players[cp].wars.includes(target)) return alert("شما از قبل با این کشور در حال جنگ هستید!");
+            
+            players[cp].wars.push(target);
+            players[target].wars.push(cp);
+            alert(`🔥 شیپور جنگ! امپراتوری ${players[cp].country} رسماً به ${players[target].country} اعلام جنگ کرد!`);
+            hasAttackedThisTurn = true;
+            render();
+        }
+
+        function clickCity(id) {
+            const cp = getCurrentTurn();
+            const clicked = cities.find(c => c.id === id);
+            
+            if (selectedId === null) {
+                if (clicked.owner === cp) {
+                    selectedId = id;
+                    updateCityInfo(clicked);
+                } else { alert("ابتدا باید یکی از شهرهای تحت کنترل خودت را انتخاب کنی!"); }
+            } else {
+                const myCity = cities.find(c => c.id === selectedId);
+                if (clicked.owner === cp) {
+                    selectedId = id;
+                    updateCityInfo(clicked);
+                } else {
+                    // اقدام به حمله جنگی
+                    if(hasAttackedThisTurn) return alert("❌ در این نوبت قبلاً حمله کرده‌اید یا اعلام جنگ داشته‌اید!");
+                    if(!players[cp].wars.includes(clicked.owner)) return alert("❌ شما با این کشور در صلح هستید! ابتدا اعلام جنگ کنید.");
+                    
+                    // چک کردن داشتن اسکله در شهر مبدا برای حمله دریایی
+                    if(!myCity.hasDock) return alert("❌ خطای استراتژیک: دریای میان شما طوفانی است! برای حمله ابتدا باید در شهر مبدا اسکله [⚓] بسازید!");
+                    
+                    startBattle(myCity, clicked);
+                }
+            }
+            render();
+        }
+
+        function updateCityInfo(city) {
+            document.getElementById('city-info').innerText = `نام شهر: ${city.name}\nجان مقاومت: ${city.hp}\nاسکله حمله: ${city.hasDock ? 'دارد ⚓' : 'ندارد'}`;
+        }
+
+        function addArtillery() {
+            if(selectedId === null || hasBuiltThisTurn) return;
+            const city = cities.find(c => c.id === selectedId);
+            const p = players[getCurrentTurn()];
+            if(city.hasArt) return alert("این شهر از قبل مجهز به توپخانه است!");
+            if(p.iron >= 150) {
+                p.iron -= 150; city.hasArt = true;
+                alert("💣 توپخانه سنگین با ۱۵۰ آهن مستقر شد! خسارت شما در این شهر ۲ برابر شد.");
+                hasBuiltThisTurn = true;
+                render();
+            } else { alert("❌ آهن کافی ندارید! (۱۵۰ آهن لازم است)"); }
+        }
+
+        function buildFort() {
+            if(selectedId === null || hasBuiltThisTurn) return;
+            const city = cities.find(c => c.id === selectedId);
+            const p = players[getCurrentTurn()];
+            if(city.hasFort) return alert("این شهر قلعه حفاظتی دارد!");
+            if(p.gold >= 200) {
+                p.gold -= 200; city.hasFort = true; city.hp += 3;
+                alert("🏰 قلعه باشکوه با ۲۰۰ طلا ساخته شد و ۳ جان به دفاع شهر اضافه شد!");
+                hasBuiltThisTurn = true;
+                render();
+            } else { alert("❌ طلا کافی ندارید! (۲۰۰ طلا لازم است)"); }
+        }
+
+        function buildDock() {
+            if(selectedId === null || hasBuiltThisTurn) return;
+            const city = cities.find(c => c.id === selectedId);
+            const p = players[getCurrentTurn()];
+            if(city.hasDock) return alert("این شهر از قبل اسکله جنگی دارد!");
+            if(p.iron >= 40) {
+                p.iron -= 40; city.hasDock = true;
+                alert("⚓ اسکله نیروی دریایی با ۴۰ آهن ساخته شد! مسیر حمله دریایی از این شهر باز شد.");
+                hasBuiltThisTurn = true;
+                render();
+            } else { alert("❌ آهن کافی ندارید! (۴۰ آهن لازم است)"); }
+        }
+
+        function endTurn() {
+            const cp = getCurrentTurn();
+            let ownedCount = cities.filter(c => c.owner === cp).length;
+            players[cp].gold += (ownedCount * 10);
+            players[cp].iron += (ownedCount * 8);
+            
+            // چرخش نوبت
+            currentIdx = (currentIdx + 1) % turnOrder.length;
+            selectedId = null;
+            hasBuiltThisTurn = false;   // آزاد کردن مجدد ساخت‌وساز برای بازیکن بعدی
+            hasAttackedThisTurn = false; // آزاد کردن مجدد حمله برای بازیکن بعدی
+            
+            document.getElementById('city-info').innerText = "هیچ شهری انتخاب نشده است.";
+            render();
+            alert(`نوبت تمام شد.\nاکنون نوبت فرمانده امپراتوری ${players[getCurrentTurn()].country} (${players[getCurrentTurn()].name}) است!`);
+        }
+
+        function startBattle(att, def) {
+            // مکانیزم دفاع ضد اسکله: اگر مدافع توپخانه داشته باشد، اسکله مهاجم را قبل از جنگ متلاشی می‌کند
+            if(def.hasArt && att.hasDock) {
+                att.hasDock = false; // نابودی اسکله مهاجم
+                alert(`💥 شلیک ناگهانی ساحلی! توپخانه مدافع (${players[def.owner].country}) پیش از پیاده شدن نیروها، اسکله مبدا شما را بمباران و کاملاً نابود کرد! حمله متوقف شد.`);
+                hasAttackedThisTurn = true;
+                return;
+            }
+
+            battle = { attCity: att, defCity: def, defChoice: null, attChoice: null };
+            document.getElementById('battle-modal').classList.remove('hidden');
+            document.getElementById('def-zone').classList.remove('hidden');
+            document.getElementById('att-zone').classList.add('hidden');
+            document.getElementById('battle-title').innerText = `نبرد بر سر فتح ${def.name}`;
+            document.getElementById('battle-turn-text').innerText = `پاسخ مدافع (${players[def.owner].name}) پنهانی انتخاب کند:`;
+        }
+
+        function playRPS(choice, role) {
+            if(role === 'def') {
+                battle.defChoice = choice;
+                document.getElementById('def-zone').classList.add('hidden');
+                document.getElementById('att-zone').classList.remove('hidden');
+                document.getElementById('battle-turn-text').innerText = `مهاجم (${players[battle.attCity.owner].name}) انتخاب کند:`;
+            } else {
+                battle.attChoice = choice;
+                finishBattle();
+            }
+        }
+
+        function finishBattle() {
+            const att = battle.attChoice; const def = battle.defChoice; let win = "draw";
+            if((att==='rock' && def==='scissors') || (att==='paper' && def==='rock') || (att==='scissors' && def==='paper')) win = "att";
+            if((def==='rock' && att==='scissors') || (def==='paper' && att==='rock') || (def==='scissors' && att==='paper')) win = "def";
+
+            if(win === "att") {
+                let dmg = battle.attCity.hasArt ? 2 : 1;
+                battle.defCity.hp -= dmg;
+                alert(`🎉 مهاجم پیروز چالش شد و ${dmg} خسارت وارد کرد!`);
+                if(battle.defCity.hp <= 0) {
+                    battle.defCity.owner = battle.attCity.owner;
+                    battle.defCity.hp = 1;
+                    battle.defCity.isCap = false;
+                    battle.defCity.hasFort = false;
+                    battle.defCity.hasDock = false; // پاکسازی سازه‌های دفاعی شهر پس از سقوط
+                    alert("💥 شهر سقوط کرد و به قلمرو شما ملحق شد!");
+                }
+            } else if(win === "def") {
+                alert("🛡️ ارتش مدافع چالش را برد و با موفقیت یورش شما را عقب راند!");
+            } else {
+                alert("🤝 نتیجه مساوی شد! هر دو ارتش بدون دستاورد عقب‌نشینی کردند.");
+            }
+
+            document.getElementById('battle-modal').classList.add('hidden');
+            selectedId = null;
+            hasAttackedThisTurn = true; // مصرف سهمیه حمله این نوبت
+            document.getElementById('city-info').innerText = "هیچ شهری انتخاب نشده است.";
+            render();
+        }
+    </script>
+</body>
+</html>
